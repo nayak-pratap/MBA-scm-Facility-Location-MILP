@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Facility Location MILP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one working column. Problem selector, input tables, action bar, then formulation + network side by side, solution below. */
+:root{
+  --bg:#EDF0F3; --surface:#FFFFFF; --surface2:#F4F6F8; --ink:#15202B; --muted:#5A6978; --line:#D2D9E0;
+  --accent:#0F5C9E; --accent-ink:#FFFFFF; --accent-soft:#E1EDF8;
+  --open:#17794F; --open-soft:#DDF1E6; --warn:#A8470F; --warn-soft:#FBE7DA;
+  --font-display:'IBM Plex Sans Condensed','Arial Narrow',system-ui,sans-serif;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E141B; --surface:#151D26; --surface2:#1B2530; --ink:#E4EAF0; --muted:#93A1AF; --line:#2B3846;
+    --accent:#5AA6E8; --accent-ink:#0A1722; --accent-soft:#16304A;
+    --open:#4CC28A; --open-soft:#123324; --warn:#F0935C; --warn-soft:#3A2314;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E141B; --surface:#151D26; --surface2:#1B2530; --ink:#E4EAF0; --muted:#93A1AF; --line:#2B3846;
+  --accent:#5AA6E8; --accent-ink:#0A1722; --accent-soft:#16304A;
+  --open:#4CC28A; --open-soft:#123324; --warn:#F0935C; --warn-soft:#3A2314;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14.5px;line-height:1.5;padding-inline:16px;padding-block:28px 56px}
+.wrap{max-width:1080px;margin-inline:auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3,p{margin:0}
+header{display:flex;flex-direction:column;gap:12px}
+h1{font-family:var(--font-display);font-weight:600;font-size:clamp(2rem,5vw,3rem);letter-spacing:-.01em;line-height:1.05;text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.04em;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:3px 8px;background:var(--surface)}
+.lede{color:var(--muted);max-width:68ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.label{font-family:var(--font-mono);font-size:.74rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:500}
+h2{font-family:var(--font-display);font-weight:600;font-size:1.2rem;letter-spacing:.005em}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px}
+.seg button{text-align:left;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.seg button strong{font-family:var(--font-display);font-size:1.05rem;font-weight:600}
+.seg button span{color:var(--muted);font-size:.86rem}
+.seg button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.counts{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:4px}
+input[type=number]{font-family:var(--font-mono);font-size:.9rem;color:var(--ink);background:var(--surface2);border:1px solid var(--line);border-radius:3px;padding:6px 8px;text-align:right;width:5rem;font-variant-numeric:tabular-nums}
+.counts input[type=number]{width:6.5rem}
+input[type=number]:focus,button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{font:inherit;font-weight:500;border-radius:4px;padding:8px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;color:var(--muted)}
+.tables{display:flex;flex-direction:column;gap:18px}
+.tbl-block{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tblwrap{overflow-x:auto;max-width:100%}
+table.grid{border-collapse:separate;border-spacing:0 4px}
+table.grid th{font-family:var(--font-mono);font-size:.72rem;font-weight:500;color:var(--muted);text-align:right;padding:0 6px 0 0;white-space:nowrap}
+table.grid th[scope=row]{text-align:left;padding-right:10px}
+table.grid td{padding:0 4px 0 0}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.status{font-size:.88rem;color:var(--muted);min-height:1.3em}
+.status.err{color:var(--warn)}
+.status.ok{color:var(--open)}
+.outgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px}
+.placeholder{color:var(--muted);border:1px dashed var(--line);border-radius:4px;padding:28px 16px;text-align:center}
+pre.formula{margin:0;font-family:var(--font-mono);font-size:.8rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;background:var(--surface2);border:1px solid var(--line);border-radius:4px;padding:12px;max-height:440px;overflow:auto}
+.netwrap{overflow-x:auto}
+svg.net{display:block;width:100%;min-width:480px;height:auto}
+.net text{font-family:var(--font-mono);font-size:11px;fill:var(--ink)}
+.net .sub{fill:var(--muted);font-size:10px}
+.net .arc{stroke:var(--line);stroke-width:1;fill:none}
+.net .flow{stroke:var(--accent);fill:none;stroke-linecap:round}
+.net .lblbg{fill:var(--surface);stroke:var(--line);stroke-width:.6}
+.net .lblbg.f{stroke:var(--accent)}
+.net .fac-open{fill:var(--open-soft);stroke:var(--open);stroke-width:1.6}
+.net .fac-closed{fill:var(--surface2);stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.net .fac-idle{fill:var(--surface2);stroke:var(--ink);stroke-width:1.2}
+.net .mkt{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+.solhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.badge{font-family:var(--font-mono);font-size:.76rem;padding:3px 9px;border-radius:3px;background:var(--open-soft);color:var(--open);border:1px solid var(--open)}
+.badge.warn{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface2);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.kpi.main{background:var(--accent-soft)}
+.kpi b{font-family:var(--font-display);font-size:1.7rem;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+table.res{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+table.res th{font-family:var(--font-mono);font-size:.72rem;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:right;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.res th:first-child,table.res td:first-child{text-align:left}
+table.res td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.res td.hit{background:var(--open-soft);color:var(--open);font-weight:600}
+table.res td.zero{color:var(--muted)}
+table.res tr.tot td{font-weight:600;border-bottom:none}
+.pill{font-family:var(--font-mono);font-size:.74rem;padding:2px 8px;border-radius:3px;border:1px solid var(--line)}
+.pill.open{background:var(--open-soft);color:var(--open);border-color:var(--open)}
+.bar{display:inline-block;vertical-align:middle;width:84px;height:8px;background:var(--surface2);border:1px solid var(--line);border-radius:2px;margin-right:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.stats{font-family:var(--font-mono);font-size:.78rem;color:var(--muted)}
+.key{font-family:var(--font-mono);font-size:.76rem;color:var(--muted)}
+textarea#reportBox{width:100%;min-height:160px;font-family:var(--font-mono);font-size:.78rem;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:10px}
+@media (prefers-reduced-motion: no-preference){.bar i{transition:width .4s ease}}
+
+body{margin:0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Facility Location <em>MILP</em></h1>
+    <div class="chips"><span class="chip">Mixed Integer Linear Program</span><span class="chip">Network viz</span><span class="chip">Branch &amp; bound solver</span></div>
+    <p class="lede">Choose which facilities to open and how to ship from them to meet every demand point at the lowest total cost. Fixed costs and capacities are set facility by facility. Every number below can be edited.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="sel-h">
+    <h2 id="sel-h">Select problem</h2>
+    <div class="seg" role="group" aria-label="Problem type">
+      <button type="button" id="mode-s" data-mode="s" aria-pressed="true"><strong>Single facility</strong><span>One capacity level per facility. Open it or keep it closed.</span></button>
+      <button type="button" id="mode-d" data-mode="d" aria-pressed="false"><strong>Dual facility</strong><span>Low and high capacity per facility, each with its own fixed cost.</span></button>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="in-h">
+    <div>
+      <h2 id="in-h">Problem data</h2>
+      <p class="lede" id="mode-note">Enter demand points, facilities, shipping costs, fixed costs and capacities. A worked example is loaded.</p>
+    </div>
+    <div class="counts">
+      <div class="field"><label class="label" for="cnt-m" id="lab-m">Demand points</label><input id="cnt-m" type="number" min="1" max="12" step="1" value="4"></div>
+      <div class="field"><label class="label" for="cnt-n">Potential facilities</label><input id="cnt-n" type="number" min="1" max="12" step="1" value="3"></div>
+      <button type="button" class="btn primary" id="btn-build">Build tables</button>
+      <button type="button" class="btn ghost" id="btn-example">Load example</button>
+    </div>
+    <div class="tables" id="tables"></div>
+  </section>
+
+  <section class="panel" aria-label="Actions">
+    <div class="actions">
+      <button type="button" class="btn" id="btn-form">Generate formulation</button>
+      <button type="button" class="btn" id="btn-net">Draw network</button>
+      <button type="button" class="btn primary" id="btn-solve">Solve MILP</button>
+      <button type="button" class="btn" id="btn-copy">Copy report</button>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite">Select problem, generate, then solve.</div>
+    <textarea id="reportBox" readonly hidden aria-label="Report text"></textarea>
+  </section>
+
+  <div class="outgrid">
+    <section class="panel" aria-labelledby="f-h">
+      <h2 id="f-h">Mathematical formulation</h2>
+      <div id="formBox"><div class="placeholder">Click “Generate formulation” to display the MILP model.</div></div>
+    </section>
+    <section class="panel" aria-labelledby="n-h">
+      <h2 id="n-h">Network diagram</h2>
+      <div id="netBox"><div class="placeholder">Click “Draw network” to see the facility and demand graph.</div></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="s-h">
+    <div class="solhead"><h2 id="s-h">Optimal solution</h2><span id="solBadge"></span></div>
+    <div id="solBox"><div class="placeholder">Click “Solve MILP” to find the cheapest set of facilities and the shipping plan.</div></div>
+  </section>
+
+  <p class="key">x[i,j] = units shipped from facility i to demand point j · y[i] ∈ {0,1} = 1 when facility i is open · Cap[i] = capacity of facility i · c[i,j] = cost per unit shipped</p>
+</div>
+
+<script>
+/*SOLVER*/
+const INF = 1e18, EPS = 1e-9;
+
+function minCostFlow(caps, c, D, total){
+  const n = caps.length, m = D.length;
+  let capSum = 0; for (const x of caps) capSum += x;
+  if (capSum < total - 1e-9) return null;
+  const N = n + m + 2, S = n + m, T = n + m + 1;
+  const to = [], cap = [], cost = [], adj = Array.from({length:N}, () => []);
+  const eidx = Array.from({length:n}, () => new Array(m).fill(-1));
+  function add(u, v, cp, cs){
+    adj[u].push(to.length); to.push(v); cap.push(cp); cost.push(cs);
+    adj[v].push(to.length); to.push(u); cap.push(0); cost.push(-cs);
+  }
+  for (let i = 0; i < n; i++){
+    if (caps[i] > 0){
+      add(S, i, caps[i], 0);
+      for (let j = 0; j < m; j++){ eidx[i][j] = to.length; add(i, n + j, INF, c[i][j]); }
+    }
+  }
+  for (let j = 0; j < m; j++) add(n + j, T, D[j], 0);
+  let flow = 0, tc = 0;
+  while (flow < total - 1e-9){
+    const dist = new Array(N).fill(Infinity), prev = new Array(N).fill(-1), inq = new Array(N).fill(false);
+    dist[S] = 0; const q = [S]; inq[S] = true;
+    while (q.length){
+      const u = q.shift(); inq[u] = false;
+      for (const e of adj[u]){
+        if (cap[e] > EPS && dist[u] + cost[e] < dist[to[e]] - 1e-12){
+          dist[to[e]] = dist[u] + cost[e]; prev[to[e]] = e;
+          if (!inq[to[e]]){ inq[to[e]] = true; q.push(to[e]); }
+        }
+      }
+    }
+    if (dist[T] === Infinity) break;
+    let f = total - flow;
+    for (let v = T; v !== S; v = to[prev[v] ^ 1]) f = Math.min(f, cap[prev[v]]);
+    for (let v = T; v !== S; v = to[prev[v] ^ 1]){ cap[prev[v]] -= f; cap[prev[v] ^ 1] += f; }
+    tc += f * dist[T]; flow += f;
+  }
+  if (flow < total - 1e-7) return null;
+  const fl = Array.from({length:n}, () => new Array(m).fill(0));
+  for (let i = 0; i < n; i++) for (let j = 0; j < m; j++){
+    if (eidx[i][j] >= 0){ const v = cap[eidx[i][j] ^ 1]; fl[i][j] = v > 1e-9 ? v : 0; }
+  }
+  return {cost: tc, flow: fl};
+}
+
+/* opts[i] = list of capacity options for facility i: [{cap, fixed, tag}] */
+function branchAndBound(c, D, opts, limit){
+  const t0 = Date.now();
+  const n = opts.length, m = D.length;
+  let total = 0; for (const x of D) total += x;
+  let best = Infinity, bestSol = null, nodes = 0, pruned = 0, infeasible = 0, hitLimit = false;
+  const dec = new Array(n).fill(-1);
+  const maxCap = opts.map(o => Math.max(...o.map(x => x.cap)));
+  function bound(){
+    let fixed = 0; const caps = new Array(n);
+    for (let i = 0; i < n; i++){
+      if (dec[i] === -1) caps[i] = maxCap[i];
+      else if (dec[i] === 0) caps[i] = 0;
+      else { const o = opts[i][dec[i] - 1]; caps[i] = o.cap; fixed += o.fixed; }
+    }
+    const r = minCostFlow(caps, c, D, total);
+    if (!r) return null;
+    return {lb: fixed + r.cost, fixed, r};
+  }
+  const root = bound();
+  if (!root) return {feasible:false, nodes:1, ms:Date.now() - t0};
+  function rec(k){
+    if (nodes >= limit){ hitLimit = true; return; }
+    const kids = [];
+    for (let ch = 0; ch <= opts[k].length; ch++){
+      dec[k] = ch; nodes++;
+      const b = bound();
+      if (!b){ infeasible++; continue; }
+      if (b.lb >= best - 1e-9){ pruned++; continue; }
+      kids.push({ch, b});
+    }
+    dec[k] = -1;
+    kids.sort((a, b) => a.b.lb - b.b.lb);
+    for (const kd of kids){
+      if (kd.b.lb >= best - 1e-9){ pruned++; continue; }
+      dec[k] = kd.ch;
+      if (k === n - 1){
+        best = kd.b.lb;
+        bestSol = {dec: dec.slice(), fixed: kd.b.fixed, variable: kd.b.r.cost, flow: kd.b.r.flow};
+      } else rec(k + 1);
+      dec[k] = -1;
+      if (hitLimit) return;
+    }
+  }
+  rec(0);
+  if (!bestSol) return {feasible:false, nodes, ms:Date.now() - t0};
+  return {feasible:true, optimal:!hitLimit, total:best, fixed:bestSol.fixed, variable:bestSol.variable,
+          dec:bestSol.dec, flow:bestSol.flow, nodes, pruned, infeasible, rootBound:root.lb, ms:Date.now() - t0};
+}
+/*END SOLVER*/
+
+const SAMPLE_S = {c:[[4,6,9,8],[7,4,5,6],[9,8,3,4]], D:[40,30,50,30], f:[400,300,250], cap:[100,80,60]};
+const SAMPLE_D = {c:[[4,6,9,8],[7,4,5,6],[9,8,3,4]], D:[40,30,50,30],
+  fl:[250,200,160], cl:[60,50,40], fh:[400,330,270], ch:[120,100,80]};
+const MAXN = {s:12, d:8};
+const dims = {s:{m:4,n:3}, d:{m:4,n:3}};
+let mode = 's', lastResult = null;
+const $ = id => document.getElementById(id);
+const range = k => Array.from({length:k}, (_, i) => i);
+
+function sampleMap(md){
+  const map = {}, smp = md === 's' ? SAMPLE_S : SAMPLE_D;
+  smp.c.forEach((row, i) => row.forEach((v, j) => map[`${md}-c-${i}-${j}`] = v));
+  smp.D.forEach((v, j) => map[`${md}-D-${j}`] = v);
+  const keys = md === 's' ? ['f','cap'] : ['fl','cl','fh','ch'];
+  keys.forEach(k => smp[k].forEach((v, i) => map[`${md}-${k}-${i}`] = v));
+  return map;
+}
+function defaultVal(id){
+  const p = id.split('-'), t = p[1], i = +p[2], j = +p[3];
+  if (t === 'c') return 4 + ((i * 3 + j * 5) % 6);
+  return {D:30, f:300, cap:100, fl:200, cl:60, fh:350, ch:120}[t];
+}
+function inp(id, val, label){
+  return `<input id="${id}" type="number" inputmode="decimal" step="any" min="0" value="${val}" aria-label="${label}">`;
+}
+function snapshot(md){
+  const s = {};
+  document.querySelectorAll(`#tables input[id^="${md}-"]`).forEach(el => s[el.id] = el.value);
+  return s;
+}
+function renderTables(md, useSample){
+  const {m, n} = dims[md];
+  const old = useSample ? {} : snapshot(md), smp = sampleMap(md);
+  const val = id => old[id] !== undefined ? old[id] : (smp[id] !== undefined ? smp[id] : defaultVal(id));
+  const mh = range(m).map(j => `<th scope="col">M${j+1}</th>`).join('');
+  let h = `<div class="tbl-block"><div class="label">Unit cost c[i,j], facility i to ${md==='s'?'demand point':'customer'} j</div><div class="tblwrap"><table class="grid"><thead><tr><th></th>${mh}</tr></thead><tbody>`;
+  for (let i = 0; i < n; i++){
+    h += `<tr><th scope="row">F${i+1}</th>` + range(m).map(j => `<td>${inp(`${md}-c-${i}-${j}`, val(`${md}-c-${i}-${j}`), `Cost F${i+1} to M${j+1}`)}</td>`).join('') + '</tr>';
+  }
+  h += `</tbody></table></div></div>`;
+  h += `<div class="tbl-block"><div class="label">Demand D[j]</div><div class="tblwrap"><table class="grid"><thead><tr>${mh}</tr></thead><tbody><tr>` +
+       range(m).map(j => `<td>${inp(`${md}-D-${j}`, val(`${md}-D-${j}`), `Demand M${j+1}`)}</td>`).join('') + `</tr></tbody></table></div></div>`;
+  if (md === 's'){
+    h += `<div class="tbl-block"><div class="label">Facility data: fixed cost f[i] and capacity Cap[i]</div><div class="tblwrap"><table class="grid"><thead><tr><th></th><th scope="col">Fixed cost</th><th scope="col">Capacity</th></tr></thead><tbody>`;
+    for (let i = 0; i < n; i++) h += `<tr><th scope="row">F${i+1}</th><td>${inp(`s-f-${i}`, val(`s-f-${i}`), `Fixed cost F${i+1}`)}</td><td>${inp(`s-cap-${i}`, val(`s-cap-${i}`), `Capacity F${i+1}`)}</td></tr>`;
+  } else {
+    h += `<div class="tbl-block"><div class="label">Facility data: fixed cost f[i] and capacity Cap[i] at each level</div><div class="tblwrap"><table class="grid"><thead><tr><th></th><th scope="col">Fixed (low)</th><th scope="col">Cap (low)</th><th scope="col">Fixed (high)</th><th scope="col">Cap (high)</th></tr></thead><tbody>`;
+    for (let i = 0; i < n; i++) h += `<tr><th scope="row">F${i+1}</th>` +
+      ['fl','cl','fh','ch'].map(k => `<td>${inp(`d-${k}-${i}`, val(`d-${k}-${i}`), `${k} F${i+1}`)}</td>`).join('') + '</tr>';
+  }
+  h += `</tbody></table></div></div>`;
+  $('tables').innerHTML = h;
+}
+function setStatus(msg, cls){ const s = $('status'); s.textContent = msg; s.className = 'status' + (cls ? ' ' + cls : ''); }
+function clearOutputs(){
+  lastResult = null;
+  $('formBox').innerHTML = '<div class="placeholder">Click “Generate formulation” to display the MILP model.</div>';
+  $('netBox').innerHTML = '<div class="placeholder">Click “Draw network” to see the facility and demand graph.</div>';
+  $('solBox').innerHTML = '<div class="placeholder">Click “Solve MILP” to find the cheapest set of facilities and the shipping plan.</div>';
+  $('solBadge').innerHTML = ''; $('reportBox').hidden = true;
+}
+function build(useSample){
+  const mEl = $('cnt-m'), nEl = $('cnt-n');
+  const m = Math.max(1, Math.min(12, Math.round(+mEl.value) || 1));
+  const n = Math.max(1, Math.min(MAXN[mode], Math.round(+nEl.value) || 1));
+  mEl.value = m; nEl.value = n; dims[mode] = {m, n};
+  renderTables(mode, useSample);
+  clearOutputs();
+  setStatus(`Tables built: ${n} facilities, ${m} ${mode==='s'?'demand points':'customers'}.`, 'ok');
+}
+function setMode(md){
+  mode = md;
+  $('mode-s').setAttribute('aria-pressed', md === 's'); $('mode-d').setAttribute('aria-pressed', md === 'd');
+  $('cnt-m').value = dims[md].m; $('cnt-n').value = dims[md].n;
+  $('cnt-n').max = MAXN[md];
+  $('lab-m').textContent = md === 's' ? 'Demand points' : 'Customers';
+  $('mode-note').textContent = md === 's'
+    ? 'Enter demand points, facilities, shipping costs, fixed costs and capacities. A worked example is loaded.'
+    : 'Each facility opens at low capacity, at high capacity, or stays closed. Edit costs, fixed costs, capacities and demand.';
+  renderTables(md, Object.keys(snapshot(md)).length === 0);
+  clearOutputs();
+  setStatus('Select problem, generate, then solve.');
+}
+
+function readData(){
+  const {m, n} = dims[mode], md = mode;
+  const num = (id, what) => {
+    const el = $(id); const v = el ? parseFloat(el.value) : NaN;
+    if (!isFinite(v) || v < 0) throw new Error(`${what} must be a number of zero or more.`);
+    return v;
+  };
+  try {
+    const c = range(n).map(i => range(m).map(j => num(`${md}-c-${i}-${j}`, `Cost F${i+1} to M${j+1}`)));
+    const D = range(m).map(j => num(`${md}-D-${j}`, `Demand M${j+1}`));
+    const d = {md, m, n, c, D};
+    if (md === 's'){ d.f = range(n).map(i => num(`s-f-${i}`, `Fixed cost F${i+1}`)); d.cap = range(n).map(i => num(`s-cap-${i}`, `Capacity F${i+1}`)); }
+    else { for (const k of ['fl','cl','fh','ch']) d[k] = range(n).map(i => num(`d-${k}-${i}`, `${k} of F${i+1}`)); }
+    return d;
+  } catch (e){ setStatus(e.message, 'err'); return null; }
+}
+function optionsFor(d){
+  return range(d.n).map(i => d.md === 's'
+    ? [{cap:d.cap[i], fixed:d.f[i], tag:''}]
+    : [{cap:d.cl[i], fixed:d.fl[i], tag:'Low'}, {cap:d.ch[i], fixed:d.fh[i], tag:'High'}]);
+}
+
+const fmt = (x, dp = 2) => { x = Math.round(x * 1e6) / 1e6; if (Math.abs(x) < 1e-7) x = 0; return x.toLocaleString('en-US', {maximumFractionDigits: dp}); };
+const sumTerms = (arr, f) => arr.map(f).join(' + ');
+
+function formulationText(d){
+  const {n, m, c, D} = d, L = [];
+  if (d.md === 's'){
+    L.push('MINIMIZE   Z = Σi f[i]·y[i] + Σi Σj c[i,j]·x[i,j]', '',
+      'SUBJECT TO',
+      '  (1) Demand      Σi x[i,j] = D[j]              for each demand point j',
+      '  (2) Capacity    Σj x[i,j] ≤ Cap[i]·y[i]        for each facility i',
+      '  (3) Domain      y[i] ∈ {0,1},  x[i,j] ≥ 0', '', '— YOUR INSTANCE —', '', 'Objective:');
+    const fx = range(n).map(i => `${fmt(d.f[i])} y[${i+1}]`);
+    const vx = []; for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) vx.push(`${fmt(c[i][j])} x[${i+1},${j+1}]`);
+    L.push('  Z = ' + fx.join(' + ') + '\n      + ' + vx.join(' + '), '', 'Demand constraints:');
+    for (let j = 0; j < m; j++) L.push(`  ${sumTerms(range(n), i => `x[${i+1},${j+1}]`)} = ${fmt(D[j])}    (M${j+1})`);
+    L.push('', 'Capacity constraints:');
+    for (let i = 0; i < n; i++) L.push(`  ${sumTerms(range(m), j => `x[${i+1},${j+1}]`)} ≤ ${fmt(d.cap[i])} y[${i+1}]    (F${i+1})`);
+    L.push('', `Binary: ${range(n).map(i => `y[${i+1}]`).join(', ')} ∈ {0,1}`);
+  } else {
+    L.push('MINIMIZE   Z = Σi (fL[i]·yL[i] + fH[i]·yH[i]) + Σi Σj c[i,j]·x[i,j]', '',
+      'SUBJECT TO',
+      '  (1) Demand      Σi x[i,j] = D[j]                           for each customer j',
+      '  (2) Capacity    Σj x[i,j] ≤ CapL[i]·yL[i] + CapH[i]·yH[i]   for each facility i',
+      '  (3) One level   yL[i] + yH[i] ≤ 1                           for each facility i',
+      '  (4) Domain      yL[i], yH[i] ∈ {0,1},  x[i,j] ≥ 0', '', '— YOUR INSTANCE —', '', 'Objective:');
+    const fx = []; for (let i = 0; i < n; i++) fx.push(`${fmt(d.fl[i])} yL[${i+1}] + ${fmt(d.fh[i])} yH[${i+1}]`);
+    const vx = []; for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) vx.push(`${fmt(c[i][j])} x[${i+1},${j+1}]`);
+    L.push('  Z = ' + fx.join(' + ') + '\n      + ' + vx.join(' + '), '', 'Demand constraints:');
+    for (let j = 0; j < m; j++) L.push(`  ${sumTerms(range(n), i => `x[${i+1},${j+1}]`)} = ${fmt(D[j])}    (C${j+1})`);
+    L.push('', 'Capacity constraints:');
+    for (let i = 0; i < n; i++) L.push(`  ${sumTerms(range(m), j => `x[${i+1},${j+1}]`)} ≤ ${fmt(d.cl[i])} yL[${i+1}] + ${fmt(d.ch[i])} yH[${i+1}]    (F${i+1})`);
+    L.push('', 'One capacity level per facility:');
+    for (let i = 0; i < n; i++) L.push(`  yL[${i+1}] + yH[${i+1}] ≤ 1`);
+    L.push('', `Binary: ${range(n).map(i => `yL[${i+1}], yH[${i+1}]`).join(', ')} ∈ {0,1}`);
+  }
+  return L.join('\n');
+}
+function showFormulation(){
+  const d = readData(); if (!d) return null;
+  $('formBox').innerHTML = `<pre class="formula" id="formPre"></pre>`;
+  $('formPre').textContent = formulationText(d);
+  setStatus('Formulation generated.', 'ok');
+  return d;
+}
+
+function facStatus(d, dec, i){
+  if (dec[i] === 0) return {open:false, label:'Closed', cap:0, fixed:0};
+  const o = optionsFor(d)[i][dec[i] - 1];
+  return {open:true, label: d.md === 's' ? 'Open' : `Open · ${o.tag}`, cap:o.cap, fixed:o.fixed};
+}
+function drawNetwork(res){
+  const d = readData(); if (!d) return;
+  const {n, m, c, D} = d, W = 760, rowH = 58, H = Math.max(n, m) * rowH + 40;
+  const fx = 150, mx = W - 150;
+  const fy = i => 30 + (i + 0.5) * ((H - 40) / n), my = j => 30 + (j + 0.5) * ((H - 40) / m);
+  const maxFlow = res ? Math.max(1e-9, ...res.flow.flat()) : 1;
+  let s = `<svg class="net" viewBox="0 0 ${W} ${H}" role="img" aria-label="Network of ${n} facilities and ${m} demand points">`;
+  s += `<text class="sub" x="${fx}" y="16" text-anchor="middle">FACILITIES</text><text class="sub" x="${mx}" y="16" text-anchor="middle">${d.md==='s'?'DEMAND POINTS':'CUSTOMERS'}</text>`;
+  let arcs = '', labels = '';
+  for (let i = 0; i < n; i++) for (let j = 0; j < m; j++){
+    const x1 = fx + 26, y1 = fy(i), x2 = mx - 20, y2 = my(j);
+    const f = res ? res.flow[i][j] : 0;
+    if (f > 1e-9){
+      arcs += `<line class="flow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke-width="${(1.5 + 5 * f / maxFlow).toFixed(2)}"/>`;
+      const t = 0.3 + 0.4 * (((i * 7 + j * 3) % 5) / 4), lx = x1 + (x2 - x1) * t, ly = y1 + (y2 - y1) * t, txt = fmt(f);
+      labels += `<rect class="lblbg f" x="${lx - txt.length * 3.4 - 4}" y="${ly - 8}" width="${txt.length * 6.8 + 8}" height="16" rx="3"/><text x="${lx}" y="${ly + 4}" text-anchor="middle">${txt}</text>`;
+    } else if (!res){
+      arcs += `<line class="arc" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      if (n * m <= 24){
+        const t = 0.3 + 0.4 * (((i * 7 + j * 3) % 5) / 4), lx = x1 + (x2 - x1) * t, ly = y1 + (y2 - y1) * t, txt = fmt(c[i][j]);
+        labels += `<rect class="lblbg" x="${lx - txt.length * 3.4 - 4}" y="${ly - 8}" width="${txt.length * 6.8 + 8}" height="16" rx="3"/><text x="${lx}" y="${ly + 4}" text-anchor="middle">${txt}</text>`;
+      }
+    }
+  }
+  s += arcs + labels;
+  for (let i = 0; i < n; i++){
+    const st = res ? facStatus(d, res.dec, i) : null;
+    const cls = !res ? 'fac-idle' : st.open ? 'fac-open' : 'fac-closed';
+    const capTxt = d.md === 's' ? `cap ${fmt(d.cap[i])}` : `cap ${fmt(d.cl[i])} / ${fmt(d.ch[i])}`;
+    const sub = res ? (st.open ? `${st.label} · ships ${fmt(res.flow[i].reduce((a, b) => a + b, 0))}` : 'Closed') : capTxt;
+    s += `<rect class="${cls}" x="${fx - 26}" y="${fy(i) - 16}" width="52" height="32" rx="4"/><text x="${fx}" y="${fy(i) + 4}" text-anchor="middle" style="font-weight:500">F${i+1}</text>` +
+         `<text class="sub" x="${fx - 34}" y="${fy(i) + 4}" text-anchor="end">${sub}</text>`;
+  }
+  for (let j = 0; j < m; j++){
+    s += `<circle class="mkt" cx="${mx}" cy="${my(j)}" r="17"/><text x="${mx}" y="${my(j) + 4}" text-anchor="middle" style="font-weight:500">M${j+1}</text>` +
+         `<text class="sub" x="${mx + 26}" y="${my(j) + 4}">demand ${fmt(D[j])}</text>`;
+  }
+  s += '</svg>';
+  $('netBox').innerHTML = `<div class="netwrap">${s}</div><p class="stats" style="margin-top:8px">${res ? 'Line width follows units shipped. Dashed boxes are closed facilities.' : 'Numbers on the lines are unit costs c[i,j].' }</p>`;
+}
+
+function solutionText(d, r){
+  if (!r.feasible) return 'NOT SOLVED: total capacity cannot meet total demand.';
+  const L = [`${r.optimal ? 'OPTIMAL' : 'BEST FOUND (node limit reached)'} SOLUTION`, '',
+    `Total cost      ${fmt(r.total)}`, `  Fixed cost    ${fmt(r.fixed)}`, `  Shipping cost ${fmt(r.variable)}`, '', 'Facilities:'];
+  for (let i = 0; i < d.n; i++){
+    const st = facStatus(d, r.dec, i), sh = r.flow[i].reduce((a, b) => a + b, 0);
+    L.push(`  F${i+1}  ${st.label.padEnd(12)} capacity ${fmt(st.cap)}  shipped ${fmt(sh)}  fixed ${fmt(st.fixed)}`);
+  }
+  L.push('', 'Flows x[i,j] (nonzero):');
+  for (let i = 0; i < d.n; i++) for (let j = 0; j < d.m; j++) if (r.flow[i][j] > 1e-9) L.push(`  x[${i+1},${j+1}] = ${fmt(r.flow[i][j], 4)}`);
+  L.push('', `B&B: ${r.nodes} nodes, ${r.pruned} pruned by bound, ${r.infeasible} infeasible, ${r.ms} ms`);
+  return L.join('\n');
+}
+function showSolution(d, r){
+  if (!r.feasible){
+    $('solBadge').innerHTML = '<span class="badge warn">Infeasible</span>';
+    $('solBox').innerHTML = '<div class="placeholder">Total capacity cannot meet total demand. Raise a capacity or lower a demand and solve again.</div>';
+    return;
+  }
+  $('solBadge').innerHTML = r.optimal ? '<span class="badge">✓ Done · proven optimal</span>' : '<span class="badge warn">Node limit reached · best found</span>';
+  let h = `<div class="kpis"><div class="kpi main"><span class="label">Total cost</span><b>${fmt(r.total)}</b></div>` +
+    `<div class="kpi"><span class="label">Fixed cost</span><b>${fmt(r.fixed)}</b></div>` +
+    `<div class="kpi"><span class="label">Shipping cost</span><b>${fmt(r.variable)}</b></div>` +
+    `<div class="kpi"><span class="label">Facilities open</span><b>${r.dec.filter(x => x > 0).length} of ${d.n}</b></div></div>`;
+  h += `<div class="tblwrap"><table class="res"><thead><tr><th>Facility</th><th>Decision</th><th>Capacity</th><th>Shipped</th><th>Utilization</th><th>Fixed cost</th></tr></thead><tbody>`;
+  for (let i = 0; i < d.n; i++){
+    const st = facStatus(d, r.dec, i), sh = r.flow[i].reduce((a, b) => a + b, 0), u = st.cap > 0 ? Math.min(100, 100 * sh / st.cap) : 0;
+    h += `<tr><td>F${i+1}</td><td><span class="pill ${st.open ? 'open' : ''}">${st.label}</span></td><td>${st.open ? fmt(st.cap) : '–'}</td><td>${fmt(sh)}</td>` +
+         `<td>${st.open ? `<span class="bar"><i style="width:${u.toFixed(1)}%"></i></span>${fmt(u, 1)}%` : '–'}</td><td>${st.open ? fmt(st.fixed) : '–'}</td></tr>`;
+  }
+  h += `</tbody></table></div>`;
+  h += `<div class="label">Shipping plan x[i,j]</div><div class="tblwrap"><table class="res"><thead><tr><th></th>${range(d.m).map(j => `<th>M${j+1}</th>`).join('')}<th>Row total</th></tr></thead><tbody>`;
+  for (let i = 0; i < d.n; i++){
+    h += `<tr><td>F${i+1}</td>` + range(d.m).map(j => { const v = r.flow[i][j]; return `<td class="${v > 1e-9 ? 'hit' : 'zero'}">${v > 1e-9 ? fmt(v, 4) : '0'}</td>`; }).join('') + `<td>${fmt(r.flow[i].reduce((a, b) => a + b, 0))}</td></tr>`;
+  }
+  h += `<tr class="tot"><td>Demand</td>${range(d.m).map(j => `<td>${fmt(d.D[j])}</td>`).join('')}<td>${fmt(d.D.reduce((a, b) => a + b, 0))}</td></tr></tbody></table></div>`;
+  h += `<p class="stats">Branch &amp; bound: ${r.nodes} nodes explored · ${r.pruned} pruned by bound · ${r.infeasible} infeasible · root bound ${fmt(r.rootBound)} · ${r.ms} ms</p>`;
+  $('solBox').innerHTML = h;
+}
+function solve(){
+  const d = readData(); if (!d) return;
+  setStatus('Solving…');
+  setTimeout(() => {
+    const r = branchAndBound(d.c, d.D, optionsFor(d), 400000);
+    lastResult = {d, r};
+    showSolution(d, r);
+    if (r.feasible){ drawNetwork(r); setStatus(`Solved. Minimum total cost ${fmt(r.total)}.`, 'ok'); }
+    else setStatus('Infeasible: total capacity is below total demand.', 'err');
+    $('formBox').innerHTML.includes('formPre') || showFormulationQuiet(d);
+  }, 20);
+}
+function showFormulationQuiet(d){
+  $('formBox').innerHTML = `<pre class="formula" id="formPre"></pre>`;
+  $('formPre').textContent = formulationText(d);
+}
+async function copyReport(){
+  const d = readData(); if (!d) return;
+  const txt = `FACILITY LOCATION MILP (${d.md === 's' ? 'single facility' : 'dual facility'})\n\n${formulationText(d)}\n\n` +
+    (lastResult ? solutionText(lastResult.d, lastResult.r) : 'Not solved yet. Click “Solve MILP”.');
+  const box = $('reportBox'); box.value = txt;
+  try { await navigator.clipboard.writeText(txt); setStatus('Report copied to the clipboard.', 'ok'); box.hidden = true; }
+  catch (e){ box.hidden = false; box.focus(); box.select(); setStatus('Copy was blocked here. The report is selected below, press Ctrl+C or ⌘C.', 'err'); }
+}
+
+if (typeof document !== 'undefined' && document.getElementById('tables')){
+  $('mode-s').addEventListener('click', () => setMode('s'));
+  $('mode-d').addEventListener('click', () => setMode('d'));
+  $('btn-build').addEventListener('click', () => build(false));
+  $('btn-example').addEventListener('click', () => { dims[mode] = {m:4, n:3}; $('cnt-m').value = 4; $('cnt-n').value = 3; build(true); setStatus('Example loaded.', 'ok'); });
+  ['cnt-m', 'cnt-n'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') build(false); }));
+  $('btn-form').addEventListener('click', showFormulation);
+  $('btn-net').addEventListener('click', () => { drawNetwork(lastResult && lastResult.r.feasible ? lastResult.r : null); setStatus('Network drawn.', 'ok'); });
+  $('btn-solve').addEventListener('click', solve);
+  $('btn-copy').addEventListener('click', copyReport);
+  renderTables('s', true);
+}
+</script>
+</body>
+</html>
